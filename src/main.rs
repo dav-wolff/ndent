@@ -1,23 +1,42 @@
 #![deny(unsafe_code)]
 
-use std::io::stdin;
+use std::io::{stdin, stdout, Read, Write, self, BufReader, BufRead};
 
 const INDENT_SIZE: u32 = 4;
 
 fn main() {
-	stdin().lines()
-		.map(|line| line.unwrap())
-		.map(|line| extract_indentation(&line))
-		.scan(0, |previous_spaces, (spaces, line)|
-			if line.is_empty() && spaces == 0 {
-				Some((*previous_spaces, line))
-			} else {
-				*previous_spaces = spaces;
-				Some((spaces, line))
-			}
-		)
-		.map(|(spaces, line)| indent_line(spaces, &line))
-		.for_each(|line| println!("{line}"));
+	indent(stdin().lock(), stdout().lock())
+		.unwrap();
+}
+
+fn indent(read: impl Read, mut write: impl Write) -> Result<(), io::Error> {
+	let mut read = BufReader::new(read);
+	
+	let mut line = String::new();
+	let mut previous_spaces = 0u32;
+	
+	while let Ok(length) = read.read_line(&mut line) {
+		// EOF
+		if length == 0 {
+			break;
+		}
+		
+		let (mut spaces, stripped_line) = extract_indentation(&line);
+		
+		if line.is_empty() && spaces == 0 {
+			spaces = previous_spaces;
+		} else {
+			previous_spaces = spaces;
+		}
+		
+		let indented_line = indent_line(spaces, &stripped_line);
+		
+		write!(write, "{indented_line}")?;
+		
+		line.clear();
+	}
+	
+	Ok(())
 }
 
 fn extract_indentation(line: &str) -> (u32, String) {
