@@ -2,14 +2,21 @@
 
 use std::io::{stdin, stdout, Read, Write, self, BufReader, BufRead};
 
-const INDENT_SIZE: u32 = 4;
+const DEFAULT_INDENT_SIZE: u32 = 4;
 
 fn main() {
-	indent(stdin().lock(), stdout().lock())
+	let mut args = std::env::args();
+	let _ = args.next(); // ndent
+	let indent_size = args.next()
+		.map(|str| str.parse::<u32>().ok())
+		.flatten()
+		.unwrap_or(DEFAULT_INDENT_SIZE);
+	
+	indent(indent_size, stdin().lock(), stdout().lock())
 		.unwrap();
 }
 
-fn indent(read: impl Read, mut write: impl Write) -> Result<(), io::Error> {
+fn indent(indent_size: u32, read: impl Read, mut write: impl Write) -> Result<(), io::Error> {
 	let mut read = BufReader::new(read);
 	
 	let mut line = String::new();
@@ -21,7 +28,7 @@ fn indent(read: impl Read, mut write: impl Write) -> Result<(), io::Error> {
 			break;
 		}
 		
-		let (mut spaces, stripped_line) = extract_indentation(&line);
+		let (mut spaces, stripped_line) = extract_indentation(indent_size, &line);
 		
 		if line.is_empty() && spaces == 0 {
 			spaces = previous_spaces;
@@ -29,7 +36,7 @@ fn indent(read: impl Read, mut write: impl Write) -> Result<(), io::Error> {
 			previous_spaces = spaces;
 		}
 		
-		let indented_line = indent_line(spaces, &stripped_line);
+		let indented_line = indent_line(indent_size, spaces, &stripped_line);
 		
 		write!(write, "{indented_line}")?;
 		
@@ -39,13 +46,13 @@ fn indent(read: impl Read, mut write: impl Write) -> Result<(), io::Error> {
 	Ok(())
 }
 
-fn extract_indentation(line: &str) -> (u32, String) {
+fn extract_indentation(indent_size: u32, line: &str) -> (u32, String) {
 	let (characters, spaces) = line.chars()
 		.map_while(|char| match char {
 			' ' => Some(1),
 			
 			
-			'\t' => Some(INDENT_SIZE),
+			'\t' => Some(indent_size),
 			_ => None,
 		})
 		.fold((0, 0), |(count, sum), spaces|
@@ -55,9 +62,9 @@ fn extract_indentation(line: &str) -> (u32, String) {
 	(spaces, line[characters..].to_owned())
 }
 
-fn indent_line(spaces: u32, line: &str) -> String {
-	let indents = spaces / INDENT_SIZE;
-	let extra_spaces = spaces % INDENT_SIZE;
+fn indent_line(indent_size: u32, spaces: u32, line: &str) -> String {
+	let indents = spaces / indent_size;
+	let extra_spaces = spaces % indent_size;
 	
 	let mut result = String::with_capacity(indents as usize + extra_spaces as usize + line.len());
 	result.extend((0..indents).map(|_| '\t'));
